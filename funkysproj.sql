@@ -1,8 +1,5 @@
 USE funkysdb;
 
-DROP TABLE IF EXISTS rough_customers;
-TRUNCATE TABLE rough_customers;
-
 CREATE TABLE rough_customers (
     customer_id bigint primary key,
     first_name varchar(100),
@@ -22,11 +19,10 @@ CREATE TABLE rough_customers (
     total_spent decimal(10,2),
     total_orders int,
     note varchar(500),
-    tax_exempt varchar(5)
 );
 
 -- * REMEMBER TO DO: SET GLOBAL local_infile = 1; *
-LOAD DATA LOCAL INFILE '/Users/zoeabsalonson/Downloads/Funkys/customers.csv'
+LOAD DATA LOCAL INFILE 'filepath.csv'
 INTO TABLE rough_customers
 FIELDS 
 	TERMINATED BY ','
@@ -41,7 +37,6 @@ SELECT
 	customer_id,
     first_name,
     last_name,
-    email,
     email_opt_in,
     city,
     province,
@@ -50,25 +45,11 @@ SELECT
     sms_opt_in,
     total_spent,
     total_orders,
-    tax_exempt
 FROM rough_customers;
 
--- Previewing cleaned names (NOT USING THIS)
-SELECT
-  first_name AS og_first,
-  CONCAT(
-    UPPER(LEFT(first_name, 1)),
-    LOWER(SUBSTRING(first_name, 2))
-    ) AS cleaned_first,
-  last_name AS og_last,
-  CONCAT(
-	UPPER(LEFT(last_name, 1)),
-	LOWER(SUBSTRING(last_name, 2))
-    ) AS cleaned_last
-FROM customers;           
 
 
--- Customers that are subscribed to email or sms marketing
+-- Total customers that are subscribed to email or sms marketing
 CREATE TABLE subscribers AS
 SELECT * FROM customers
 WHERE sms_opt_in = "yes" OR email_opt_in = "yes";
@@ -79,10 +60,6 @@ CONCAT(FORMAT(((SELECT COUNT(*) FROM subscribers) / (SELECT COUNT(*) FROM custom
 AS subscriber_pct;
 
 
--- Number of customers per each order number value (customers grouped by total orders)
-SELECT COUNT(*), total_orders FROM customers
-GROUP BY total_orders
-ORDER BY total_orders ASC;
 
 -- Customers that made no purchases
 CREATE TABLE nopurchase AS
@@ -109,7 +86,6 @@ SELECT
 customer_id,
 first_name,
 last_name,
-email,
 email_opt_in,
 city,
 province,
@@ -117,12 +93,12 @@ country,
 cell_phone,
 sms_opt_in,
 total_orders,
-tax_exempt,
 total_spent,
 total_spent/NULLIF(total_orders,0) AS avg_spent
 FROM customers
 WHERE total_orders >=1 AND total_spent >= 0.40 
 ORDER BY total_spent ASC;
+
 
 
 -- Total number and percentage of customers who made at least one purchase
@@ -140,6 +116,7 @@ CREATE TABLE spent_numbered AS (
         COUNT(*) OVER () AS total_rows
 	FROM spenders
 );
+
 
 
 -- Descriptive statistics for spenders
@@ -173,6 +150,7 @@ FROM spenders
 WHERE rn IN (round(0.25*total_spenders), round(0.50*total_spenders), round(0.75*total_spenders));
 
 
+
 -- Distribution of orders
 SELECT
 total_orders,
@@ -180,6 +158,7 @@ COUNT(*) AS count
 FROM spenders
 GROUP BY total_orders
 ORDER BY total_orders ASC;
+
 
 
 -- Top 20% of spenders (based on total spent)
@@ -259,7 +238,6 @@ WITH segmented AS (
         END AS segment
     FROM spent_numbered
 )
-
 SELECT
     segment, -- Labels each row by segment
     ROUND(SUM(s.total_spent),2) AS total_spent, -- Total amount spent
@@ -342,6 +320,7 @@ ORDER BY
     END;
 
 
+-- Get average amount spent by and amount of subscribers vs. non-subscribers 
 WITH subspenders AS (
 	    SELECT *,
         CASE
@@ -355,23 +334,6 @@ SELECT
 	CONCAT('$', FORMAT(AVG(total_spent), 2)) as avg_spent,
     COUNT(*) AS subcount,
     CONCAT(FORMAT(COUNT(*)/(SELECT COUNT(*) FROM spenders)*100, 2), '%') AS subratio
-FROM subspenders
-GROUP BY sub;
-
--- Are subscribers more likely to make a second purchase?
-WITH subspenders AS (
-SELECT *,
-        CASE
-            WHEN sms_opt_in = "yes" OR email_opt_in = "yes" THEN 'Subscribed'
-            ELSE 'Not Subscribed'
-        END AS sub
-    FROM spenders
-)
-SELECT
-sub AS sub_status,
-SUM(total_orders) AS total_orders,
-COUNT(*) AS spender_count,
-SUM(total_orders)/COUNT(*) AS avg_order
 FROM subspenders
 GROUP BY sub;
 
@@ -516,15 +478,45 @@ WHERE prov_rank <= 5
 ORDER BY province, city_rev DESC;
 
 
--- Province/state subscribers vs. revenue
+-- City subscribers vs. revenue
+WITH ranked AS (
+    SELECT
+        country,
+        province,
+        city,
+        total_spent,
+        sms_opt_in,
+        email_opt_in,
+        ROW_NUMBER() OVER (PARTITION BY country, province, city ORDER BY total_spent) AS rn,
+        COUNT(*) OVER (PARTITION BY country, province, city) AS n
+    FROM spenders
+),
+medians AS (
+    SELECT
+        country,
+        province,
+        city,
+        AVG(total_spent) AS median_spent
+    FROM ranked
+    WHERE rn IN (FLOOR((n + 1)/2), FLOOR((n + 2)/2))
+    GROUP BY country, province, city
+)
 SELECT 
-country,
-province,
-SUM(sms_opt_in = 'yes' OR email_opt_in = 'yes') AS subs,
-SUM(total_spent) AS prov_rev
-FROM spenders
-GROUP BY country, province
-ORDER BY prov_rev DESC;
+    s.country,
+    s.province,
+    s.city,
+    COUNT(*) AS spender_count,
+    SUM(s.total_spent)/COUNT(*) AS avg_spent,
+    m.median_spent,
+    SUM(s.sms_opt_in = 'yes' OR s.email_opt_in = 'yes') AS subs,
+    SUM(s.sms_opt_in = 'yes' OR s.email_opt_in = 'yes') / COUNT(*) AS sub_proportion,
+    SUM(s.total_spent) AS city_rev
+FROM spenders s
+JOIN medians m 
+    ON s.country = m.country AND s.province = m.province AND s.city = m.city
+GROUP BY s.country, s.province, s.city, m.median_spent
+ORDER BY city_rev DESC;
+
 
 -- Revenue from subscribers vs. non-subscribers by province/state
 SELECT 
@@ -546,6 +538,7 @@ GROUP BY country, province
 ORDER BY prov_rev DESC;
 
 
+-- Relevant spending information for Canada
 SELECT
 country,
 province,

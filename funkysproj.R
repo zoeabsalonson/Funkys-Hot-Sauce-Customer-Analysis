@@ -105,40 +105,6 @@ dev.off()
 
 
 
-#Plot pareto chart for spending (color code three spending tiers)
-pdf("spending_pareto.pdf", onefile = TRUE)
-spenders %>%
-  mutate(
-    segment = case_when(
-      total_spent >= quantile(total_spent, 0.8) ~ "Top 20%",
-      total_spent <= quantile(total_spent, 0.2) ~ "Bottom 20%",
-      TRUE ~ "Middle 60%"
-    )
-  ) %>%
-  arrange(desc(total_spent)) %>%
-  mutate(cumulative_spend = cumsum(total_spent),
-         cumulative_pct = cumulative_spend/sum(total_spent)
-  ) %>%
-  ggplot(aes(x=reorder(customer_id, -total_spent))) +
-  geom_bar(aes(y=total_spent, fill=segment), stat="identity") +
-  geom_line(aes(y=cumulative_pct * max(total_spent), group=1),
-            color="red", linewidth=1) +
-  scale_y_continuous(
-    name="Customer Spending",
-    sec.axis=sec_axis(~./max(spenders$total_spent),
-                      name="Cumulative Percentage")
-  ) +
-  theme_minimal() +
-  theme(axis.text.x=element_blank()) +
-  labs(
-    title="Pareto Chart of Customer Spending",
-    x="Customers (ordered by spending)",
-    fill="Customer Segment"
-  )
-dev.off()
-
-
-
 #Segment spenders into five spending tiers
 spenders_segments <- spenders %>%
   mutate(
@@ -216,16 +182,6 @@ wilcox.test(s$total_spent, n$total_spent, "g")
 
 
 
-#Plot subscribed spenders' spending distribution
-pdf("subsc_distr_totalspent.pdf", onefile = TRUE)
-hist(sub_spenders$total_spent, breaks=60, main="Distribution of Total Spent Among Subscribed SC", xlab="Total Spent (USD)")
-dev.off()
-
-#Plot non-subscribed spenders' spending distribution
-pdf("nsubsc_distr_totalspent.pdf", onefile = TRUE)
-hist(nsub_spenders$total_spent, breaks=60, main="Distribution of Total Spent Among Non-subscribed SC", xlab="Total Spent (USD)")
-dev.off()
-
 #Plot (all) spenders' spending distribution
 pdf("sc_distr_totalspent.pdf", onefile = TRUE)
 hist(spenders$total_spent, breaks=60, main="Distribution of Total Spent Among SC", xlab="Total Spent (USD)")
@@ -260,45 +216,17 @@ dev.off()
 median(n$total_spent)
 median(s$total_spent)
 
-#Generate linear model for orders vs. spending
-order_model <- lm(spenders$total_spent ~ spenders$total_orders)
-summary(order_model)
-
-#Linear model diagnostic plots
-pdf(file = "OrderModel_Diagnostic_Plots.pdf", width = 8, onefile = TRUE)
-par(mfrow = c(2,2))
-plot(order_model)
-dev.off()
-
-#Order vs. spending scatterplot
-pdf("OrderSpendingScatterplot.pdf", onefile = TRUE)
-par(mfrow=c(1,1))
-plot(spenders$total_orders, spenders$total_spent, pch=20, xlab="Total Orders", ylab="Total Spent", main="Total Orders vs. Total Spent")
-dev.off()
-
-#Plot linear model against scatterplot
-pdf("OrderModel_Plot.pdf", onefile = TRUE)
-par(mfrow=c(1,1))
-plot(spenders$total_orders, spenders$total_spent, pch=20, xlab="Total Orders", ylab="Total Spent", main="Linear Model for Orders vs. Spending")
-abline(order_model, col="blue", lwd=2)
-dev.off()
 
 
-
-#Geographic subscriber information
+#Geographic subscriber information from city subscriber revenue SQL query
 csub <- read.csv('cityrev_sub.csv', header=TRUE, sep=",")
 
-psub_model <- lm(psub$median_spent ~ psub$sub_proportion)
+#Generate linear model for subscriber proportion in all cities vs. median spent in respective regions
 csub_model <- lm(csub$median_spent ~ csub$sub_proportion)
 summary(psub_model)
 
-pdf(file = "csub_diag_plots.pdf", width = 8, onefile = TRUE)
-par(mfrow = c(2,2))
-plot(csub_model)
-dev.off()
-
 #Plot sub_proportion vs median spent by city
 pdf("city_subvrev.pdf", onefile = TRUE)
-plot(csub$sub_proportion, csub$median_spent, pch=20, xlab="Proportion of Subscribed SC", ylab="Median Spent ($USD)", main="Subscribers and Median Spent by city")
+plot(csub$sub_proportion, csub$median_spent, pch=20, xlab="Proportion of Subscribed SC", ylab="Median Spent ($USD)", main="Subscribers and Median Spent by City")
 abline(csub_model, col="blue", lwd=2)
 dev.off()

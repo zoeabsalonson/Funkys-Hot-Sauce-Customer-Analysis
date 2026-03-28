@@ -39,7 +39,7 @@ Key Findings:
 
 Recommendations:
 * Focus on increasing marketing acceptance through targeted incentives.
-* Convert non-spending customers by develop strategies such as first-purchase discounts, personalized outreach, and targeted campaigns
+* Convert non-spending customers by developing strategies such as first-purchase discounts, personalized outreach, and campaigns
 * Retain and leverage high-value customers through loyalty programs, bundles, and/or repeat-purchase incentives
 * Targeted marketing in underperforming regions to diversify the customer base.
 * Leverage social media and brand exposure by partnering with media presences.

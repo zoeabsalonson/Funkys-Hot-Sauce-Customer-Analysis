@@ -1,4 +1,5 @@
-# Funky's Hot Sauce Customer Insights and Consumption Behavior Analysis
+# Customer Insights and Consumption Behavior Analysis
+# Funky's Hot Sauce Factory
 
 Background:
 Understanding customer spending behavior is essential for driving business growth. 
